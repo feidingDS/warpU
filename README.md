@@ -24,7 +24,7 @@ under the conditions stated in the paper.
 Requires Python ≥ 3.9 and a C compiler.
 
 ```bash
-git clone https://github.com/<your-account>/warpU.git
+git clone https://github.com/feidingDS/warpU.git
 cd warpU/pywarpu
 pip install .
 ```
