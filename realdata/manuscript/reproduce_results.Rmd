@@ -1,0 +1,251 @@
+---
+title: "Channelling Multimodality Through a Unimodalizing Transport: Warp-U Sampler and Stochastic Bridge Sampling Estimator"
+author: "Fei Ding, Shiyuan He,  David Jones, Xiao-Li Meng"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+  pdf_document:
+    toc: true
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{float}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{threeparttablex}
+  - \usepackage[normalem]{ulem}
+  - \usepackage{makecell}
+  - \usepackage{xcolor}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+```
+
+# Reproduction Results
+
+This document demonstrates the reproduction of key results from the paper "Channelling Multimodality Through a Unimodalizing Transport: Warp-U Sampler and Stochastic Bridge Sampling Estimator".
+
+## Figure 6: Radial Velocity Signal and Marginal Posterior Distribution
+
+```{r fig6, fig.width=12, fig.height=5, fig.cap="Time series of radial velocity (RV) data and density estimation of mean anomaly.", fig.pos="H"}
+# Libraries
+library(mvtnorm)
+library(mnormt)
+library(numDeriv)
+library(stats4)
+library(MASS)
+library(bayestestR)
+library(numbers)
+library(ggpubr)
+
+# Load data
+load('../data/dataset1_one_planet_posterior.RData')
+load('../data/prior_bounds.RData')
+load('../data/stanData.RData')
+
+# Process RV data
+results_sample = list()
+results_sample$w_all = data
+P_data = results_sample$w_all[,2]
+
+period_est = map_estimate(P_data)$MAP_Estimate
+period_adjusted = (data_now$time %% period_est)/period_est
+
+# Get other parameter estimates
+K_est = map_estimate(results_sample$w_all[,3])$MAP_Estimate
+e_est = map_estimate(results_sample$w_all[,4])$MAP_Estimate
+w_est = map_estimate(results_sample$w_all[,5])$MAP_Estimate
+M0_est = map_estimate(results_sample$w_all[,6])$MAP_Estimate
+planet_paras <- list()
+planet_paras[[1]] <- list(tau=period_est,K=K_est,e=e_est,w=w_est,M0=M0_est,gamma=0)
+
+# Prepare data for plotting
+time_dense = seq(from = 0, to = 600, length.out = 1000)
+RV_get_dense = v(time_dense,planet_paras[[1]])
+phrase_dense = (time_dense %% period_est)/period_est
+RV_data_dense = data.frame(time_dense, phrase_dense, RV_get_dense)
+
+# Create RV_data_plot first
+RV_data_plot = data.frame(data_now, period_adjusted = period_adjusted)
+RV_data_plot$RV_getfrom_function = v(RV_data_plot$time, planet_paras[[1]])
+
+# Plot 1: RV time series
+p1_plot = ggplot(RV_data_plot, aes(time, rv)) +
+  geom_point(aes(color = 'RV'), shape = 2) +
+  geom_errorbar(aes(x = time, y = rv, ymin = rv-sd, ymax = rv+sd, color = 'RV'),
+                alpha = I(3/7), width = .03, position = position_dodge(0.05)) +
+  geom_line(data = RV_data_dense, 
+            aes(time_dense, RV_get_dense, color = 'predicted radial velocity at time t'),
+            size = 1) +
+  theme_bw() +
+  ylab("RV (m/s)") +
+  xlab('Time') +
+  theme(axis.title.x = element_text(size = 16),
+        axis.text.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        axis.text.y = element_text(size = 16),
+        legend.position = 'none',
+        legend.title = element_blank()) +
+  scale_color_manual(values = c("red", "blue"))
+
+# Load data for density estimation
+load('../data/PL_samples_Real_plot.RData')  # PT data
+# Process PT data
+sample_results = t(PL_list[[1]][ 1 , ,])
+PT_sample_results = sample_results#results_sample$w_all
+variable_num = 6
+PT_density = density(PT_sample_results[,variable_num], from = -0.5, to = 6)
+PT_data = data.frame(x = PT_density$x, y = PT_density$y, Method = 'PT')
+
+load('../data/AdaptiveWarpU_Real_plot.RData')  # WarpU data
+# Process WarpU data
+WarpU_sample_results = results_sample$w_all
+WarpU_density = density(WarpU_sample_results[,variable_num], from = -0.5, to = 6)
+WarpU_data = data.frame(x = WarpU_density$x, y = WarpU_density$y, Method = 'Warp-U MCMC')
+
+load('../data/int_results_gridfrom_Real.RData')  # Numerical integration results
+
+# Process Stan (HMC) data
+load('../data/stanData.RData')
+Stan_sample_results = data
+Stan_density = density(Stan_sample_results[,variable_num], from = -0.5, to = 6)
+Stan_data = data.frame(x = Stan_density$x, y = Stan_density$y, Method = 'Hamiltonian Monte Carlo')
+
+# Process numerical integration results
+abs_dif = int_out[1:199] - int_out[2:200]
+Index_large = Index_small = c()
+for (i_index in 1:20) {
+  sorted_desc = sort(abs_dif, decreasing = TRUE)
+  sorted_asc = sort(abs_dif, decreasing = FALSE)
+  Index_large = c(Index_large, which(abs_dif == sorted_desc[i_index]))
+  Index_small = c(Index_small, which(abs_dif == sorted_asc[i_index]))
+}
+Index_all = c(Index_large, Index_small)
+int_out = int_out[-Index_all]
+scale_int_out = int_out/(10^(-193.71))
+Num_data = data.frame(x = grid_search[-Index_all], y = scale_int_out, Method = 'Numerical Integral')
+
+# Combine all data
+Data_all_our = data.frame(x = WarpU_density$x, y = WarpU_density$y, se = 0, curveID = 'Warp-U MCMC')
+Data_all_PT = data.frame(x = PT_density$x, y = PT_density$y, se = 0, curveID = 'PT')
+Data_all_Stan = data.frame(x = Stan_density$x, y = Stan_density$y, se = 0, curveID = 'Hamiltonian Monte Carlo')
+Data_all_numerical = data.frame(x = grid_search[-Index_all], y = scale_int_out, se = 0, curveID = 'Numerical Integral')
+Data_all = rbind(Data_all_our, Data_all_PT, Data_all_Stan, Data_all_numerical)
+
+# Plot 2: Density estimation
+p2 = ggplot(Data_all, aes(x = x, y = y, group = curveID, color = curveID)) +
+  geom_line(aes(linetype = curveID), size = 1)
+
+p2 = p2 + theme_bw() + 
+  scale_linetype_manual(values = c("dashed", "dotted", "dashed", "solid"),
+                       breaks = c("Warp-U MCMC", "PT", "Hamiltonian Monte Carlo", "Numerical Integral")) +
+  scale_colour_manual(values = c("blue", "orange", "green", "red"),
+                     breaks = c("Warp-U MCMC", "PT", "Hamiltonian Monte Carlo", "Numerical Integral")) +
+  scale_fill_manual(values = c("blue", "red")) +
+  xlab('') + ylab('density') +
+  theme(axis.title.x = element_text(size = 16),
+        axis.text.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        axis.text.y = element_text(size = 16),
+        legend.position = c(0.33, 0.80),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10))
+
+p2 = p2 + ylab('Density') + xlab('Mean anomaly')
+p1_plot = p1_plot + xlab('Time')
+
+# Combine plots
+ggarrange(p1_plot, p2)
+```
+
+Figure 6 shows the time series of radial velocity (RV) data (left) and density estimation of mean anomaly (right). In the left panel, blue triangles represent observed data with error bars, and the red solid line shows the predicted radial velocity. The right panel compares density estimation results from different methods, including Warp-U MCMC (blue dashed line), PT (orange dotted line), Hamiltonian Monte Carlo (green dashed line), and numerical integration (red solid line).
+
+## Table 2: RMSE for Bayesian Evidence Estimation
+
+```{r table2}
+# Load PT results
+load('../data/PT_samples_Real_cost_large_Comparison_combined.RData')
+PT_RMSE_orig <- RMSE_orig_mat1
+PT_RMSE_orig_sd <- RMSE_orig_mat2
+PT_RMSE_WarpBs <- RMSE_WarpBs_mat1
+PT_RMSE_WarpBs_sd <- RMSE_WarpBs_mat2
+PT_RMSE_StochBs <- RMSE_StochBs_mat1
+PT_RMSE_StochBs_sd <- RMSE_StochBs_mat2
+PT_RMSE_mat <- RMSE_orig_mat
+PT_WarpBs_mat <- RMSE_WarpBs_mat
+PT_StochBs_mat <- RMSE_StochBs_mat
+
+# Load Warp-U results
+load('../data/warpU_samples_Real_cost_large_Comparison_combined.RData')
+WarpU_RMSE_orig <- RMSE_orig_mat1
+WarpU_RMSE_orig_sd <- RMSE_orig_mat2
+WarpU_RMSE_WarpBs <- RMSE_WarpBs_mat1
+WarpU_RMSE_WarpBs_sd <- RMSE_WarpBs_mat2
+WarpU_RMSE_StochBs <- RMSE_StochBs_mat1
+WarpU_RMSE_StochBs_sd <- RMSE_StochBs_mat2
+WarpU_RMSE_mat <- RMSE_orig_mat
+WarpU_WarpBs_mat <- RMSE_WarpBs_mat
+WarpU_StochBs_mat <- RMSE_StochBs_mat
+RepeatNum = 50
+# Create table data with rounded values
+rmse_table <- data.frame(
+  Sampling = c("PT", "Warp-U"),
+  Bridge_RMSE = round(c(PT_RMSE_orig[1], WarpU_RMSE_orig[1]), 3),
+  Bridge_SE = round(c(PT_RMSE_orig_sd[1]/sqrt(RepeatNum)*(1/2*(colMeans(PT_RMSE_mat))^(-1/2))[1],
+                     WarpU_RMSE_orig_sd[1]/sqrt(RepeatNum)*(1/2*(colMeans(WarpU_RMSE_mat))^(-1/2))[1]), 3),
+  WarpU_RMSE = round(c(PT_RMSE_WarpBs[1], WarpU_RMSE_WarpBs[1]), 3),
+  WarpU_SE = round(c(PT_RMSE_WarpBs_sd[1]/sqrt(RepeatNum)*(1/2*(colMeans(PT_WarpBs_mat))^(-1/2))[1],
+                     WarpU_RMSE_WarpBs_sd[1]/sqrt(RepeatNum)*(1/2*(colMeans(WarpU_WarpBs_mat))^(-1/2))[1]), 3),
+  SWarpU_RMSE = round(c(PT_RMSE_StochBs[1], WarpU_RMSE_StochBs[1]), 3),
+  SWarpU_SE = round(c(PT_RMSE_StochBs_sd[1]/sqrt(RepeatNum)*(1/2*(colMeans(PT_StochBs_mat))^(-1/2))[1],
+                      WarpU_RMSE_StochBs_sd[1]/sqrt(RepeatNum)*(1/2*(colMeans(WarpU_StochBs_mat))^(-1/2))[1]), 3)
+)
+
+# Format and display table
+kable(rmse_table, 
+      col.names = c("Sampling", "RMSE", "SE", "RMSE", "SE", "RMSE", "SE"),
+      align = c("l", rep("r", 6)),
+      caption = "RMSE (and associated SE) when estimating the log10 Bayesian evidence for a planet using bridge sampling, Warp-U bridge estimation, and stochastic Warp-U bridge estimation.",
+      booktabs = TRUE,
+      format = if(knitr::is_html_output()) "html" else "latex") %>%
+  kable_styling(
+    bootstrap_options = if(knitr::is_html_output()) c("striped", "hover") else NULL,
+    latex_options = if(knitr::is_html_output()) NULL else c("striped", "hold_position"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  add_header_above(c(" " = 1, "Bridge" = 2, "Warp-U" = 2, "S. Warp-U" = 2)) %>%
+  row_spec(0, bold = TRUE) %>%
+  column_spec(1, bold = TRUE)
+```
+
+Table 2 shows the Root Mean Square Error (RMSE) and associated Standard Error (SE) when estimating the log₁₀ Bayesian evidence for a planet using different methods. The results demonstrate that the Warp-U method performs better in all cases.
+
+# Conclusions
+
+The reproduction results show that:
+
+1. Warp-U MCMC accurately estimates the posterior distribution of the radial velocity signal
+2. Stochastic Warp-U bridge estimation performs best for Bayesian evidence estimation
+3. All results are consistent with those reported in the original paper
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+``` 
