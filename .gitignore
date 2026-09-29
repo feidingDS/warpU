@@ -1,0 +1,16 @@
+# Python / Cython build products
+__pycache__/
+*.py[cod]
+*.so
+*.c
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+# R
+.Rproj.user/
+.Rhistory
+.RData
+# OS
+.DS_Store
