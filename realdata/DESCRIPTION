@@ -1,0 +1,67 @@
+Package: WarpUMCMC
+Title: Warp-U MCMC and Stochastic Bridge Estimation
+Version: 1.0.0
+Authors@R: c(
+    person(given = "Fei",
+           family = "Ding",
+           role = c("aut", "cre"),
+           email = "flymark8@gmail.com"),
+    person(given = "Shiyuan",
+           family = "He",
+           role = c("aut", "cre"),
+           email = "heshiyuan@btbu.edu.cn"),
+    person(given = "David",
+           family = "Jones",
+           role = "aut",
+           email = "dav.jones2000@gmail.com"),
+    person(given = "Xiao-Li",
+           family = "Meng",
+           role = "aut",
+           email = "xlmeng@g.harvard.edu")
+)
+Description: Implementation of the Warp-U MCMC method and stochastic bridge 
+    estimation for Bayesian inference in high-dimensional parameter spaces. 
+    The method improves MCMC efficiency through innovative sampling techniques.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R (>= 4.0.0)
+Imports: 
+    FNN,
+    mvtnorm,
+    mnormt,
+    numDeriv,
+    stats4,
+    MASS,
+    R6,
+    ggplot2,
+    mclust,
+    transport,
+    e1071,
+    sn,
+    RiskPortfolios,
+    knitr,
+    rmarkdown,
+    kableExtra,
+    gridExtra,
+    ggpubr,
+    dplyr,
+    tidyr,
+    stringr,
+    magrittr,
+    tinytex,
+    bayestestR,
+    numbers,
+    dplyr,
+    LaplacesDemon,
+    smfsb,
+    foreach,
+    doParallel,
+    rstan,
+    cubature
+Suggests:
+    testthat
+SystemRequirements:
+    LaTeX distribution (e.g., TinyTeX)
+RoxygenNote: 7.1.1 

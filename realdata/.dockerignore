@@ -1,0 +1,7 @@
+output/
+.git/
+.Rproj.user/
+.Rhistory
+renv/library/
+renv/local/
+renv/cache/ 
